@@ -4,16 +4,22 @@ package net.sf.cobolToJson.impl;
 import java.io.BufferedOutputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Reader;
+import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.math.BigDecimal;
 import java.util.List;
 
-
+//import com.fasterxml.jackson.core.JsonParseException;
+//import com.fasterxml.jackson.databind.JsonNode;
+//import com.fasterxml.jackson.databind.ObjectMapper;
+//import com.saasquatch.jsonschemainferrer.JsonSchemaInferrer;
+//import com.saasquatch.jsonschemainferrer.SpecVersion;
 
 import net.sf.JRecord.Common.AbstractFieldValue;
 import net.sf.JRecord.Common.Conversion;
@@ -25,6 +31,7 @@ import net.sf.JRecord.External.CobolCopybookLoader;
 import net.sf.JRecord.External.ICopybookLoaderCobol;
 import net.sf.JRecord.External.XmlCopybookLoader;
 import net.sf.JRecord.IO.AbstractLineReader;
+import net.sf.JRecord.IO.IReadLine;
 import net.sf.JRecord.IO.ListLineWriter;
 import net.sf.JRecord.def.IO.builders.ISchemaIOBuilder;
 import net.sf.JRecord.schema.CobolSchemaDetails;
@@ -40,14 +47,16 @@ import net.sf.JRecord.util.errorLog.ILogLinesInError;
 //import net.sf.JRecord.schema.jaxb.Item;
 import net.sf.cobolToJson.def.ICobol2Json;
 import net.sf.cobolToJson.def.Icb2xml2Json;
+import net.sf.cobolToJson.impl.jsonSchema.WriteJsonSchema;
+import net.sf.cobolToJson.impl.jsonWriter.IJsonWriter;
+import net.sf.cobolToJson.impl.jsonWriter.JsonSchemaCreator;
+import net.sf.cobolToJson.impl.jsonWriter.JsonWriter;
 import net.sf.cobolToJson.impl.readJson.JsonToCobol;
 import net.sf.cobolToJson.impl.readJson.ToJRecordFile;
 import net.sf.cobolToJson.impl.readJson.ToJRecordLine;
-
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
+import net.sf.cobolToJson.impl.updateSchema.BlankLineReader;
+import net.sf.cobolToJson.impl.updateSchema.BlankLineReaderAllOptions;
+import net.sf.cobolToJson.impl.updateSchema.UpdateDetailsForSampleRecords;
 
 
 /**
@@ -59,8 +68,6 @@ import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICobol2Json {
 
 	
-//	private ISchemaIOBuilder iob;
-//	private Copybook copybook = null;
 	private ISchemaInformation itemDtls = null;
 	
 	private CobolSchemaDetails cobolSchemaDetails = null;
@@ -70,9 +77,6 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	private ILogLinesInError logErrors = new BasicErrorLog();
 
 	
-//	private HashMap<String, IArrayItemCheck> arrayChecks = new HashMap<String, IArrayItemCheck>();
-//	private boolean dropCopybook = false;
-//	private int splitOption = CopybookLoader.SPLIT_NONE ;
 
 	
 	
@@ -109,7 +113,7 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	public void cobol2json(InputStream cobolStream, Writer writer) throws IOException {
 		doInit();
 		
-        cobol2json(cobolSchemaDetails.ioBuilder.newReader(cobolStream), new JsonFactory().createGenerator(writer));
+        cobol2json(cobolSchemaDetails.ioBuilder.newReader(cobolStream), newJsonGenerator(writer));
         writer.close();
 	}
 
@@ -128,12 +132,13 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	public void singleCobolRecord2json(byte[] cobolData, Writer writer) throws IOException {
 		doInit();
 		
-		JsonGenerator w = new JsonFactory().createGenerator(writer);
-		LineItemHelper lineItemHelper = new LineItemHelper(cobolSchemaDetails.schema);
+		JsonWriter w = newJsonGenerator(writer);
+		LineItemHelper lineItemHelper = new LineItemHelper(cobolSchemaDetails.schema, false);
 
-        if (prettyPrint) {
-        	w.setPrettyPrinter(new DefaultPrettyPrinter());
-        }
+		w.initWriter(prettyPrint);
+//        if (prettyPrint) {
+//        	w.setPrettyPrinter(new DefaultPrettyPrinter());
+//        }
     	//w.writeStartObject();
 		writeLineAsRecord(
 				w, 
@@ -160,33 +165,96 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	public void cobol2json(InputStream cobolStream, OutputStream jsonStream) throws IOException {
 		doInit();
 		
-        cobol2json(cobolSchemaDetails.ioBuilder.newReader(cobolStream), new JsonFactory().createGenerator(jsonStream));
+        cobol2json(cobolSchemaDetails.ioBuilder.newReader(cobolStream), new JsonWriter(jsonStream));
         jsonStream.close();
 	}
+	
+	@Override
+	public ICobol2Json writeSampleCobol2json(String fileName) throws IOException {
+		return writeSampleCobol2json(new FileWriter(fileName));
+	}
+	
+	@Override
+	public ICobol2Json writeSampleCobol2json(Writer writer) throws IOException {
+		UpdateDetailsForSampleRecords updDtls = doInitForSampleJson(true);
+		
+		LayoutDetail layout = getLayout();
+		cobol2json(layout, new BlankLineReaderAllOptions(updDtls.getExitManager(), layout), newJsonGenerator(writer), false);
+		return this;
+	}
+	
+	@Override
+	public ICobol2Json jsonSchemaForCobol2json(Writer writer) throws IOException {
+		doInitForSampleJson(true);
+		LayoutDetail layout = getLayout();
+		JsonSchemaCreator schemaCreator = new JsonSchemaCreator();
 
-	private void cobol2json(AbstractLineReader reader, JsonGenerator writer) throws IOException {
-		LayoutDetail schema =  reader.getLayout();
+		cobol2json(layout, new BlankLineReader(layout), schemaCreator, true);
+		
+		new WriteJsonSchema(writer, schemaCreator.getSchemaItem());
+
+		return this;
+	}
+	
+	
+//	public ICobol2Json jsonSchemaForCobol2json2(Writer writer) throws IOException {
+//		StringWriter sampleJsonWriter = new StringWriter();
+//		
+//		writeSampleCobol2json(sampleJsonWriter);
+//		
+//		ObjectMapper mapper = new ObjectMapper();
+//		JsonNode sampleJson = mapper.readTree(new StringReader(sampleJsonWriter.toString()));
+//		JsonSchemaInferrer infer = JsonSchemaInferrer.newBuilder()
+//			      .setSpecVersion(SpecVersion.DRAFT_06)
+//			      .build();
+//		
+//		JsonNode schema = infer.inferForSample(sampleJson);
+//		writer.write(schema.toPrettyString());
+//		writer.close();
+//
+//		
+//		return this;
+//	}
+
+
+	private JsonWriter newJsonGenerator(Writer writer) throws IOException {
+		return new JsonWriter(writer);
+	}
+	
+	private void cobol2json(AbstractLineReader reader, JsonWriter writer) throws IOException {
+		cobol2json(reader.getLayout(), reader, writer, false);
+		
+		reader.close();
+	}
+
+
+	private void cobol2json(LayoutDetail schema, IReadLine reader, IJsonWriter jsonWriter, boolean arraySizeOne) throws IOException {
+//		LayoutDetail schema =  reader.getLayout();
+//	private void cobol2json(AbstractLineReader reader, JsonGenerator writer) throws IOException {
+//		LayoutDetail schema =  reader.getLayout();
         AbstractLine l;
-        LineItemHelper lineItemHelper = new LineItemHelper(schema);
+        LineItemHelper lineItemHelper = new LineItemHelper(schema, arraySizeOne);
         //List<? extends IItem> items = cobolSchemaDetails.cobolCopybook.getCobolItems();
        	List<ItemRecordDtls> recordItems = cobolSchemaDetails.recordItems;
 
        	//writer.set
-       	writer.enable(JsonGenerator.Feature.AUTO_CLOSE_JSON_CONTENT);
-       	writer.enable(JsonGenerator.Feature.FLUSH_PASSED_TO_STREAM);
-        if (prettyPrint) {
-        	writer.setPrettyPrinter(new DefaultPrettyPrinter());
-        }
+//       	jsonWriter.enable(JsonGenerator.Feature.AUTO_CLOSE_JSON_CONTENT);
+//       	jsonWriter.enable(JsonGenerator.Feature.FLUSH_PASSED_TO_STREAM);
+//        if (prettyPrint) {
+//        	jsonWriter.setPrettyPrinter(new DefaultPrettyPrinter());
+//        }
+       	
+       	jsonWriter.initWriter(prettyPrint);
         
  		try {
 	    	//writer.writeStartObject();
 			if (recordItems.size() == 1) {
 		    	//ItemRecordDtls itemRecordDtls = recordItems.get(0);
 		    	List<Item> itemList = recordItems.get(0).items;
-		    	Item itm;
+		    	Item itm = itemList.size() == 0 ? null : itemList.get(0) ;
 				String recordName = schema.getRecord(0).getRecordName();
 				if (itemList.size() == 1 
-				&& (itm =itemList.get(0)).getItemType() == Item.TYPE_GROUP
+				&& (itm).getItemType() == Item.TYPE_GROUP
 				&& itm.getChildItems().size() > 0) {
 					if (itm.getName() != null && itm.getName().length() > 0) {
 						recordName = itm.getName();
@@ -194,21 +262,21 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 					itemList = itm.getChildItems();
 				}
 				
-				arrayStart(writer, itemDtls.updateName(recordName));
+				arrayStart(itm, jsonWriter, itemDtls.updateName(recordName));
 				//writer.writeArrayFieldStart(itemDtls.updateName(recordName));
 			    while ((l = reader.read()) != null) {
-			    	writer.writeStartObject();
-					writeItems(writer, lineItemHelper.setLine(l), itemList, new IntStack());
-			        writer.writeEndObject();
+			    	jsonWriter.writeStartObject();
+					writeItems(jsonWriter, lineItemHelper.setLine(l), itemList, new IntStack());
+			        jsonWriter.writeEndObject();
 			    }
 			} else if (schema.hasTreeStructure()) {
-			   	ReadManager rm = new ReadManager(reader, schema);
+			   	ReadManager rm = new ReadManager(reader, schema, lineItemHelper);
 				String rootRecordName = super.getRootRecord();
 			   	rm.read();
 			   	
 			   	int rootIdx = -1;
 				if (rootRecordName == null) {
-					for (int i =0; i < schema.getRecordCount(); i++) {
+					for (int i = 0; i < schema.getRecordCount(); i++) {
 						if (schema.getRecord(i).getParentRecordIndex() < 0) {
 							rootRecordName = schema.getRecord(i).getRecordName();
 							rootIdx = i;
@@ -221,13 +289,13 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 					
 				if (rootRecordName == null) {
 				   	//writer.writeStartArray();
-					arrayStart(writer, 
+					arrayStart(null, jsonWriter, 
 							cobolSchemaDetails.copybookInformation.updateName(cobolSchemaDetails.schema.getLayoutName()));
 					//writer.writeArrayFieldStart(cobolSchemaDetails.copybookInformation.updateName(cobolSchemaDetails.schema.getLayoutName()));
 					while (rm.line != null) {
-						writer.writeStartObject();
-						writeItemInTree(writer, rm, recordItems);
-						writer.writeEndObject();
+						jsonWriter.writeStartObject();
+						writeItemInTree(jsonWriter, rm, recordItems);
+						jsonWriter.writeEndObject();
 					}
 				} else {
 					if (rootIdx < 0) { throw new RecordException("Root Record: " + rootRecordName + " does not exist" ); }
@@ -248,21 +316,22 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 								+ " and not " + schema.getRecord(rm.recordIdx).getRecordName());
 					}
 					
-					arrayStart(writer, itemDtls.updateName(schema.getRecord(rm.recordIdx).getRecordName()));
+					arrayStart(null, jsonWriter, itemDtls.updateName(schema.getRecord(rm.recordIdx).getRecordName()));
 					//writer.writeArrayFieldStart(itemDtls.updateName(schema.getRecord(rm.recordIdx).getRecordName()));
 				    while (rm.line != null) {
 						if (rm.recordIdx < 0) {
 							logErrors.logErrorLine(rm.lineNumber, rm.line);
+							rm.read();
 						} else {							
 							ItemRecordDtls recordDtls = recordItems.get(rm.recordIdx);
 	
 							switch (recordDtls.items.size()) {
 							case 0: break;
 							case 1:
-								writeSingleTreeItemInArray(writer, rm, recordItems, rm.recordIdx, recordDtls.items.get(0));
+								writeSingleTreeItemInArray(jsonWriter, rm, recordItems, rm.recordIdx, recordDtls.items.get(0));
 								break;
 							default:
-								writeMultiTreeItemRecords(writer, rm, recordItems, rm.recordIdx, recordDtls);
+								writeMultiTreeItemRecords(jsonWriter, rm, recordItems, rm.recordIdx, recordDtls);
 							}
 						}
 				    }
@@ -271,24 +340,24 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 				int lineNo = 0;
 				//writer.writeStartArray();
 				
-				arrayStart(writer, cobolSchemaDetails.copybookInformation.updateName(cobolSchemaDetails.schema.getLayoutName()));
+				arrayStart(null, jsonWriter, cobolSchemaDetails.copybookInformation.updateName(cobolSchemaDetails.schema.getLayoutName()));
 				//writer.writeArrayFieldStart(cobolSchemaDetails.copybookInformation.updateName(cobolSchemaDetails.schema.getLayoutName()));
 				while ((l = reader.read()) != null) {
-					lineNo = writeLineAsRecord(writer, l, lineItemHelper, recordItems, lineNo);
+					lineNo = writeLineAsRecord(jsonWriter, l, lineItemHelper, recordItems, lineNo);
 				}
 			}
 
-			writer.writeEndArray();
+			jsonWriter.writeEndArray();
 			
 			if (nameMainArray) {
-				writer.writeEndObject();
+				jsonWriter.writeEndObject();
 			}
 		} finally {
 	        try {
-				writer.flush();
-				writer.close();
+				jsonWriter.close();
 				//jsonStream.close();
-				reader.close();
+	        } catch (IOException ioe) {
+	        	throw ioe;
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -296,25 +365,25 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 		}
 	}
 	
-	private void arrayStart(JsonGenerator writer, String fieldName) throws IOException {
+	private void arrayStart(IItem item, IJsonWriter jsonWriter, String fieldName) throws IOException {
 		if (nameMainArray) {
-	    	writer.writeStartObject();
-			writer.writeArrayFieldStart(fieldName);
+			jsonWriter.writeStartObject();
+			jsonWriter.writeArrayFieldStart(item, fieldName);
 		} else {
-			writer.writeStartArray();
+			jsonWriter.writeStartArray(item);
 		}
 	}
 
-	private int writeLineAsRecord(JsonGenerator writer, AbstractLine l, LineItemHelper lineItemHelper,
+	private int writeLineAsRecord(IJsonWriter jsonWriter, AbstractLine l, LineItemHelper lineItemHelper,
 			List<ItemRecordDtls> recordItems, int lineNo) throws IOException {
 		int recordIdx = l.getPreferredLayoutIdx();
 		lineNo += 1;
 		if (recordIdx < 0) {
 			logErrors.logErrorLine(lineNo, l);
 		} else {
-			writer.writeStartObject();
-			writeItems(writer, lineItemHelper.setLine(l), recordItems.get(recordIdx).items, new IntStack());
-			writer.writeEndObject();
+			jsonWriter.writeStartObject();
+			writeItems(jsonWriter, lineItemHelper.setLine(l), recordItems.get(recordIdx).items, new IntStack());
+			jsonWriter.writeEndObject();
 		}
 		return lineNo;
 	}
@@ -326,6 +395,19 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 		
         skipValidation = ! itemDtls.isRedefinedBinaryField();
 	}
+	
+	
+	private UpdateDetailsForSampleRecords doInitForSampleJson(boolean simulateExits) throws IOException {
+		UpdateDetailsForSampleRecords updDetails = new UpdateDetailsForSampleRecords(super.getUpdateDetails(), simulateExits);
+		cobolSchemaDetails = super.getCobolSchemaDetails(updDetails);
+
+		itemDtls = cobolSchemaDetails.copybookInformation;
+		
+        skipValidation = ! itemDtls.isRedefinedBinaryField();
+        
+        return updDetails;
+	}
+
 
 	/**
 	 * @param prettyPrint the prettyPrint to set
@@ -342,7 +424,7 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 		return this;
 	}
 
-	private void writeItemInTree(JsonGenerator writer, ReadManager rm, List<ItemRecordDtls> recordItems) 
+	private void writeItemInTree(IJsonWriter jsonWriter, ReadManager rm, List<ItemRecordDtls> recordItems) 
 	throws IOException {
 
 
@@ -355,10 +437,10 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	  		switch (recordDtls.items.size()) {
 	  		case 0: break;
 	  		case 1:
-				writeSingleTreeItemRecord(writer, rm, recordItems, recIdx, recordDtls.items.get(0));
+				writeSingleTreeItemRecord(jsonWriter, rm, recordItems, recIdx, recordDtls.items.get(0));
 				break;
 			default:
-				writeMultiTreeItemRecords(writer, rm, recordItems, recIdx, recordDtls);
+				writeMultiTreeItemRecords(jsonWriter, rm, recordItems, recIdx, recordDtls);
 	  		}
 		}
 	}
@@ -371,13 +453,13 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	 * @param recordDtls
 	 * @throws IOException
 	 */
-	private void writeMultiTreeItemRecords(JsonGenerator writer, ReadManager rm, List<ItemRecordDtls> recordItems,
+	private void writeMultiTreeItemRecords(IJsonWriter jsonWriter, ReadManager rm, List<ItemRecordDtls> recordItems,
 			int recIdx, ItemRecordDtls recordDtls) throws IOException {
-		writer.writeStartObject();
+		jsonWriter.writeStartObject();
 		for (Item itm : recordDtls.items) {
-			writeSingleTreeItemRecord(writer, rm, recordItems, recIdx, itm);
+			writeSingleTreeItemRecord(jsonWriter, rm, recordItems, recIdx, itm);
 		}	
-		writer.writeEndObject();
+		jsonWriter.writeEndObject();
 	}
 
 
@@ -389,54 +471,56 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	 * @param item
 	 * @throws IOException
 	 */
-	private void writeSingleTreeItemRecord(JsonGenerator writer, ReadManager rm, List<ItemRecordDtls> recordItems,
+	private void writeSingleTreeItemRecord(
+			IJsonWriter jsonWriter, ReadManager rm, List<ItemRecordDtls> recordItems,
 			int recIdx, IItem item) throws IOException {
 		
-		writer.writeObjectFieldStart(item.getNameToUse());
-		writeTreeItemRecord(writer, rm, recordItems, recIdx, item);
-		writer.writeEndObject();
+		jsonWriter.writeObjectFieldStart(item, item.getNameToUse());
+		writeTreeItemRecord(jsonWriter, rm, recordItems, recIdx, item);
+		jsonWriter.writeEndObject();
 	}
-	private void writeSingleTreeItemInArray(JsonGenerator writer, ReadManager rm, List<ItemRecordDtls> recordItems,
+	private void writeSingleTreeItemInArray(IJsonWriter jsonWriter, ReadManager rm, List<ItemRecordDtls> recordItems,
 			int recIdx, IItem item) throws IOException {
 		
-		writer.writeStartObject(item.getNameToUse());
-		writeTreeItemRecord(writer, rm, recordItems, recIdx, item);
-		writer.writeEndObject();
+//		jsonWriter.writeStartObject(item, item.getNameToUse());
+		jsonWriter.writeStartObject();
+		writeTreeItemRecord(jsonWriter, rm, recordItems, recIdx, item);
+		jsonWriter.writeEndObject();
 	}
 
 
 	/**
-	 * @param writer
+	 * @param jsonWriter
 	 * @param rm
 	 * @param items
 	 * @param recIdx
 	 * @param item
 	 * @throws IOException
 	 */
-	public void writeTreeItemRecord(JsonGenerator writer, ReadManager rm,
+	public void writeTreeItemRecord(IJsonWriter jsonWriter, ReadManager rm,
 			List<ItemRecordDtls> recordItems, int recIdx, IItem item) throws IOException {
 		
 		if ( item.isOkToWriteItem(rm.line)) {
 			if (item.getItemType() == IItem.TYPE_GROUP) {
-				writeAnItem(writer, null, rm.lineItemHelper, item, new IntStack());
-				writeChildren(writer, rm, recordItems, recIdx);	
+				writeAnItem(jsonWriter, null, rm.lineItemHelper, item, new IntStack());
+				writeChildren(jsonWriter, rm, recordItems, recIdx);	
 			} else {
-				writer.writeStartObject();
-				writeAnItem(writer, null, rm.lineItemHelper, item, new IntStack());
-				writeChildren(writer, rm, recordItems, recIdx);
-				writer.writeEndObject();
+				jsonWriter.writeStartObject();
+				writeAnItem(jsonWriter, null, rm.lineItemHelper, item, new IntStack());
+				writeChildren(jsonWriter, rm, recordItems, recIdx);
+				jsonWriter.writeEndObject();
 			}
 		}
 	}
 
 	/**
-	 * @param writer
+	 * @param jsonWriter
 	 * @param rm
 	 * @param items
 	 * @param recIdx
 	 * @throws IOException
 	 */
-	public void writeChildren(JsonGenerator writer, ReadManager rm,
+	public void writeChildren(IJsonWriter jsonWriter, ReadManager rm,
 			List<ItemRecordDtls> recordItems, int recIdx) throws IOException {
 		rm.read();
 		int lastIdx = -121;
@@ -452,36 +536,36 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 			case 1:
 				Item item = recordDtls.items.get(0);
 				if (first) {
-					writer.writeArrayFieldStart(item.getNameToUse());
+					jsonWriter.writeArrayFieldStart(item, item.getNameToUse());
 				}  else if (lastIdx != rm.recordIdx) {
-					writer.writeEndArray();
-					writer.writeArrayFieldStart(item.getNameToUse());
+					jsonWriter.writeEndArray();
+					jsonWriter.writeArrayFieldStart(item, item.getNameToUse());
 				}
 				lastIdx = rm.recordIdx;
 
-				writeSingleTreeItemInArray(writer, rm, recordItems, rm.recordIdx, item);
+				writeSingleTreeItemInArray(jsonWriter, rm, recordItems, rm.recordIdx, item);
 				break;
 			default:
 				if (first) {
-					writer.writeArrayFieldStart(record.getRecordName());
+					jsonWriter.writeArrayFieldStart(recordDtls.items.get(0), record.getRecordName());
 				}  else if (lastIdx != rm.recordIdx) {
-					writer.writeEndArray();
-					writer.writeArrayFieldStart(record.getRecordName());
+					jsonWriter.writeEndArray();
+					jsonWriter.writeArrayFieldStart(recordDtls.items.get(0), record.getRecordName());
 				}
 				lastIdx = rm.recordIdx;
 
-				writeMultiTreeItemRecords(writer, rm, recordItems, recIdx, recordDtls);
+				writeMultiTreeItemRecords(jsonWriter, rm, recordItems, recIdx, recordDtls);
 			}
 			
 			first = false;
 		}
 		
 		if (lastIdx >= 0) {
-			writer.writeEndArray();
+			jsonWriter.writeEndArray();
 		}
 	}
 	
-	private void writeItem(JsonGenerator writer, LineItemHelper l, IItem item, IntStack indexs) throws IOException {
+	private void writeItem(IJsonWriter jsonWriter, LineItemHelper l, IItem item, IntStack indexs) throws IOException {
 
 		String name = item.getName();
 		if (! item.isOkToWriteItem(l.getLine())) {
@@ -489,50 +573,50 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 		} else if (name == null || item.getName().length() == 0 || "filler".equalsIgnoreCase(name)) {
 			if (item.getItemType() == IItem.TYPE_GROUP) {
 				if (item.getOccurs() != null && item.getOccurs() >= 1) {
-					writeArray(writer, l, item, "filler", indexs);
+					writeArray(jsonWriter, l, item, "filler", indexs);
 				} else {
-					writeItems(writer, l, item.getChildItems(), indexs);
+					writeItems(jsonWriter, l, item.getChildItems(), indexs);
 				}
 			}
 		} else if (item.getOccurs() != null && item.getOccurs() > 1) {
-			writeArray(writer, l, item, item.getNameToUse(), indexs);
+			writeArray(jsonWriter, l, item, item.getNameToUse(), indexs);
 		} else {
-			writeAnItem(writer, item.getNameToUse(), l, item, indexs);
+			writeAnItem(jsonWriter, item.getNameToUse(), l, item, indexs);
 		}
 	}
 
 	/**
-	 * @param writer
+	 * @param jsonWriter
 	 * @param l
 	 * @param item
 	 * @param indexs
 	 * @throws IOException 
 	 */
-	private void writeAnItem(JsonGenerator writer, String fieldname, LineItemHelper l, IItem item,
+	private void writeAnItem(IJsonWriter jsonWriter, String fieldname, LineItemHelper l, IItem item,
 			IntStack indexs) throws IOException {
 		if (item.getItemType() == IItem.TYPE_GROUP) {
-			if (fieldname == null) {
-				writeItems(writer, l, item.getChildItems(), indexs);
+			if (fieldname == null || (isFlatten() && item.isCanBeFlattened())) {
+				writeItems(jsonWriter, l, item.getChildItems(), indexs);
 			} else {
-				writer.writeObjectFieldStart(fieldname);
-				writeItems(writer, l, item.getChildItems(), indexs);
-				writer.writeEndObject();
+				jsonWriter.writeObjectFieldStart(item, fieldname);
+				writeItems(jsonWriter, l, item.getChildItems(), indexs);
+				jsonWriter.writeEndObject();
 			}
 		} else if (indexs.size == 0) {
-			writeField(writer, l.getLine(), fieldname, l.getFieldValue(item, null), item);
+			writeField(jsonWriter, l.getLine(), fieldname, l.getFieldValue(item, null), item);
 		} else {
-			writeField(writer, l.getLine(), fieldname, l.getFieldValue(item, indexs.toArray()), item);
+			writeField(jsonWriter, l.getLine(), fieldname, l.getFieldValue(item, indexs.toArray()), item);
 		}
 	}
 
 	/**
-	 * @param writer
+	 * @param jsonWriter
 	 * @param l
 	 * @param item
 	 * @param indexs
 	 * @throws IOException 
 	 */
-	private void writeArray(JsonGenerator writer, LineItemHelper l, IItem item, String name,
+	private void writeArray(IJsonWriter jsonWriter, LineItemHelper l, IItem item, String name,
 			IntStack indexs) throws IOException {
 		int num = l.getArrayCount(item, indexs.toArray());
 //		String dependingOn = item.getDependingOn();
@@ -560,14 +644,14 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 				}
 			} else { 
 				if (writeArrayStart) {
-					writer.writeArrayFieldStart(name);
+					jsonWriter.writeArrayFieldStart(item, name);
 					writeArrayStart = false;
 				}
 				if (item.getItemType() == IItem.TYPE_GROUP) {
 					if ( item.isOkToWriteItem(l.getLine())) {
-						writer.writeStartObject();
-						writeItems(writer, l, item.getChildItems(), indexs.set(i));
-						writer.writeEndObject();
+						jsonWriter.writeStartObject();
+						writeItems(jsonWriter, l, item.getChildItems(), indexs.set(i));
+						jsonWriter.writeEndObject();
 					}
 				} else {
 					indexArray[indexArray.length - 1] = i;
@@ -580,9 +664,9 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 
 						if (bd != null) {
 							if (item.isFormatFieldAvailable()) {
-								writer.writeString(item.formatField(bd.toString()));
+								jsonWriter.writeString(item, item.formatField(bd.toString()));
 							} else {
-								writer.writeNumber(bd);
+								jsonWriter.writeNumber(item, bd);
 							}
 						} else {
 							s = "";
@@ -595,19 +679,19 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 					
 					if (s != null) {
 						//writer.writeString(val.asString()); I think it is wrong
-						writer.writeString(s);
+						jsonWriter.writeString(item, s);
 					}
 				}
 //				writer.writeEndArray();
 			}
 		}
 		if (! writeArrayStart) {
-			writer.writeEndArray();
+			jsonWriter.writeEndArray();
 		}
 		indexs.remove();
 	}
 	
-	private void writeItems(JsonGenerator writer, LineItemHelper l, List<? extends IItem> items, IntStack indexs) throws IOException {
+	private void writeItems(IJsonWriter jsonWriter, LineItemHelper l, List<? extends IItem> items, IntStack indexs) throws IOException {
 
 		int i = 0;
 		while (i < items.size()) {
@@ -617,13 +701,13 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 				
 				if (itemsToUses != null) {
 					for (IItem redefItm : itemsToUses) {
-						writeItem(writer, l, redefItm, indexs);
+						writeItem(jsonWriter, l, redefItm, indexs);
 					}
 				}
 				
 				i += item.getRedefineItemCount();
 			} else {
-				writeItem(writer, l, item, indexs);
+				writeItem(jsonWriter, l, item, indexs);
 				i += 1;
 			}
 		}
@@ -632,7 +716,7 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 //		}
 	}
 	
-	private void writeField(JsonGenerator writer, AbstractLine line, String fieldName, AbstractFieldValue val, IItem item) throws IOException {
+	private void writeField(IJsonWriter jsonWriter, AbstractLine line, String fieldName, AbstractFieldValue val, IItem item) throws IOException {
 		try {
 			if (val.isNumeric()) {
 				try {
@@ -641,16 +725,16 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 						if (item.isFormatFieldAvailable()) {
 							String formatField = item.formatField(bd.toString());
 							//System.out.println(formatField);
-							writer.writeStringField(fieldName, formatField);
+							jsonWriter.writeStringField(item, fieldName, formatField);
 						} else {
-							writer.writeNumberField(fieldName, bd);
+							jsonWriter.writeNumberField(item, fieldName, bd);
 						}
 					}
 				} catch (Exception e) {	}
 			} else {
 				String formatedField = getStrValue(val, item);
 				if (formatedField != null && formatedField.trim().length() > 0) {
-					writer.writeStringField(fieldName, formatedField);
+					jsonWriter.writeStringField(item, fieldName, formatedField);
 				}
 			}
 		} catch (Exception e) {
@@ -682,7 +766,7 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	
 	
 	@Override
-	public ICobol2Json jsonArrayToCobolFile(String jsonFileName, String outFileName) throws JsonParseException, IOException {
+	public ICobol2Json jsonArrayToCobolFile(String jsonFileName, String outFileName) throws IOException {
 		ISchemaIOBuilder ioBuilder = asIOBuilder();
 		
 		(new JsonToCobol())
@@ -694,7 +778,7 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	
 
 	@Override
-	public List<AbstractLine> jsonArrayToCobolLines(Reader jsonReader) throws JsonParseException, IOException {
+	public List<AbstractLine> jsonArrayToCobolLines(Reader jsonReader) throws IOException {
 		ListLineWriter lw = new ListLineWriter();
 		(new JsonToCobol()).readJson(
 				jsonReader,
@@ -705,7 +789,7 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	
 
 	@Override
-	public ICobol2Json jsonArrayToCobolFile(Reader jsonReader, OutputStream outStream) throws JsonParseException, IOException {
+	public ICobol2Json jsonArrayToCobolFile(Reader jsonReader, OutputStream outStream) throws IOException {
 		ISchemaIOBuilder ioBuilder = asIOBuilder();
 		
 		(new JsonToCobol()).readJson(
@@ -716,7 +800,7 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	}
 
 	@Override
-	public ICobol2Json jsonObjectToCobolFile(String jsonFileName, String outFileName) throws JsonParseException, IOException {
+	public ICobol2Json jsonObjectToCobolFile(String jsonFileName, String outFileName) throws IOException {
 		ISchemaIOBuilder ioBuilder = asIOBuilder();
 		
 		(new JsonToCobol()).readJson(
@@ -728,7 +812,7 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	
 
 	@Override
-	public ICobol2Json jsonObjectToCobolFile(Reader jsonReader, OutputStream outStream) throws JsonParseException, IOException {
+	public ICobol2Json jsonObjectToCobolFile(Reader jsonReader, OutputStream outStream) throws IOException {
 		ISchemaIOBuilder ioBuilder = asIOBuilder();
 		
 		(new JsonToCobol()).readJson(
@@ -740,7 +824,7 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	
 
 	@Override
-	public byte[] jsonStringToSingleCobolRecord(String json) throws JsonParseException, IOException {
+	public byte[] jsonStringToSingleCobolRecord(String json) throws IOException {
 		AbstractLine line = asIOBuilder().newLine();
 		
 		(new JsonToCobol()).processJson(json, new ToJRecordLine(line), super.getRenameToCobol());
@@ -1126,17 +1210,17 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	}
 
 	private static class ReadManager {
-		final AbstractLineReader reader;
+		final IReadLine reader;
 		final LayoutDetail schema;
 		AbstractLine line;
 		int recordIdx, lineNumber = 0;
 		final LineItemHelper lineItemHelper;
 		
-		ReadManager(AbstractLineReader r, LayoutDetail schema) {
+		ReadManager(IReadLine r, LayoutDetail schema, LineItemHelper lineItemHelper) {
 			super();
 			this.reader = r;
 			this.schema = schema;
-			lineItemHelper = new LineItemHelper(schema);
+			this.lineItemHelper = lineItemHelper;
 		}
 		
 		void read() throws IOException {

@@ -64,6 +64,7 @@ public class TstRedefineCheck {
 	
 	@Test
 	public void test() throws IOException {
+
 		ICobol2Json cbl2Json = getCobol2Json()
 				.setRedefineSelection("Group-1", new IRedefineSelection() {
 
@@ -86,7 +87,7 @@ public class TstRedefineCheck {
 
 		cbl2Json.cobol2json(new ByteArrayInputStream(file.getBytes()), w);
 		
-//		System.out.print(w.toString());
+		System.out.print(w.toString());
 		
 		assertEquals(result, w.toString());
 	}

@@ -43,6 +43,7 @@ public class Dtar020ToJson02 {
               .cobol2json(input, 
                           output);
         input.close();
-        System.out.print(new String(output.toByteArray()));
+        String JSON = new String(output.toByteArray());
+		System.out.print(JSON);
     }
 }

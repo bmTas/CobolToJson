@@ -253,6 +253,22 @@ public interface Icb2xml2Json extends Icb2xmlLoadOptions {
 	 */
 	public Icb2xml2Json setNameMainArray(boolean nameMainArray);
 
+	/**
+	 * Write sample Json from the Cobol copybook
+	 * @param fileName filename where the json is to be written
+	 * @return builder for more updates
+	 * @throws IOException
+	 */
+	Icb2xml2Json writeSampleCobol2json(String fileName) throws IOException;
+
+	/**
+	 * Write sample Json from the Cobol copybook
+	 * @param writer Writer where the json is to be written
+	 * @return  builder for more updates
+	 * @throws IOException
+	 */
+	Icb2xml2Json writeSampleCobol2json(Writer writer) throws IOException;
+
 //	/**
 //	 * Convert Input Json-Data to Cobol Data-File
 //	 * 

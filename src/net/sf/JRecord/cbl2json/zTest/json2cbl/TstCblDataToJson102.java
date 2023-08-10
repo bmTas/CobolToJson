@@ -164,7 +164,7 @@ public class TstCblDataToJson102 {
 	 * @return
 	 */
 	public ICobol2Json createPoBuilder(String copybookFileName, String splitId, int tagFormat) {
-		return createXmlBuilder(copybookFileName, splitId, tagFormat)
+		return createJsonBuilder(copybookFileName, splitId, tagFormat)
 					      .setRecordSelection("PO-Record", newFieldSelection("Record-Type","H1"))
 					      .setRecordSelection("Product-Record", newFieldSelection("Record-Type","D1"))
 					      .setRecordSelection("Location-Record", newFieldSelection("Record-Type","S1"));
@@ -176,7 +176,7 @@ public class TstCblDataToJson102 {
 
 		ByteArrayOutputStream os = new ByteArrayOutputStream(0x10000);
 
-		createXmlBuilder(copybookFileName, splitId, tagFormat)
+		createJsonBuilder(copybookFileName, splitId, tagFormat)
 					      .setRecordPositionCode("Header-Record",  Options.RP_FIRST_RECORD_IN_FILE)
 					      .setRecordPositionCode("Detail-Record",  Options.RP_MIDDLE_RECORDS)
 					      .setRecordPositionCode("Trailer-Record", Options.RP_LAST_RECORD_IN_FILE)
@@ -192,7 +192,7 @@ public class TstCblDataToJson102 {
 		ByteArrayOutputStream os = new ByteArrayOutputStream(0x10000);
 
 				
-		createXmlBuilder(copybookFileName, splitId, tagFormat)
+		createJsonBuilder(copybookFileName, splitId, tagFormat)
 				      .cobol2json(new FileInputStream(dataFileName), os);
 
 	    return os.toByteArray();
@@ -203,7 +203,7 @@ public class TstCblDataToJson102 {
 	 * @param copybookFileName
 	 * @return
 	 */
-	private ICobol2Json createXmlBuilder(String copybookFileName, String splitId, int tagFormat) {
+	private ICobol2Json createJsonBuilder(String copybookFileName, String splitId, int tagFormat) {
 		int split = CopybookLoader.SPLIT_01_LEVEL;
 		if ("N".equals(splitId)) {
 			split = CopybookLoader.SPLIT_NONE;

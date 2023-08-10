@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.io.Reader;
 
 import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 
@@ -23,15 +22,15 @@ import net.sf.JRecord.schema.fieldRename.StdFieldRenameItems;
 public class JsonToCobol {
 
 	JsonFactory factory = new JsonFactory();
-	public void readJson(String jsonFileName, IProcessFields processFields, IRenameField renameField) throws IOException, JsonParseException {
+	public void readJson(String jsonFileName, IProcessFields processFields, IRenameField renameField) throws IOException {
 		readJson(processFields, new ParserMgr(factory.createParser(new File(jsonFileName)), renameField));
 	}
 	
-	public void readJson(Reader jsonReader, IProcessFields processFields, IRenameField renameField) throws IOException, JsonParseException {
+	public void readJson(Reader jsonReader, IProcessFields processFields, IRenameField renameField) throws IOException {
 		readJson(processFields, new ParserMgr(factory.createParser(jsonReader), renameField));
 	}
 	
-	public void processJson(String json, IProcessFields processFields, IRenameField renameField) throws IOException, JsonParseException {
+	public void processJson(String json, IProcessFields processFields, IRenameField renameField) throws IOException {
 		readJson(processFields, new ParserMgr(factory.createParser(json), renameField));
 	}
 

@@ -2,14 +2,12 @@ package net.sf.JRecord.cbl2json.zExample;
 
 import java.io.IOException;
 
-import com.fasterxml.jackson.core.JsonParseException;
-
 import net.sf.cobolToJson.impl.readJson.IProcessFields;
 import net.sf.cobolToJson.impl.readJson.JsonToCobol;
 
 public class ReadJsonTest2 {
 
-	public static void main(String[] args) throws JsonParseException, IOException {
+	public static void main(String[] args) throws IOException {
 		(new JsonToCobol()).readJson("G:/Temp/amsPoDownload_records.json", new ProcessFlds(), null);
 		//(new JsonToCobol()).readJson("G:/Temp/DTAR020_tst1.bin.json", new ProcessFlds());
 	}

@@ -7,8 +7,6 @@ import java.io.Reader;
 import java.io.Writer;
 import java.util.List;
 
-import com.fasterxml.jackson.core.JsonParseException;
-
 import net.sf.JRecord.Details.AbstractLine;
 import net.sf.JRecord.Details.RecordDecider;
 import net.sf.JRecord.ExternalRecordSelection.ExternalSelection;
@@ -69,10 +67,16 @@ public interface ICobol2Json  extends  Icb2xml2Json  {
 	/**
 	 * Whether to add a field name to the main array
 	 * @param nameMainArray wether to name the main JSON array
-	 * @return
+	 * @return Builder for more updates
 	 */
 	@Override ICobol2Json setNameMainArray(boolean nameMainArray);
 
+	/**
+	 * Wether to flatten the JSon output or not
+	 * @param flatten wether to flatyten the JSon output
+	 * @return Builder for more updates
+	 */
+	ICobol2Json setFlattenStructure(boolean flatten);
 	
 	/**
 	 * {@inheritDoc}
@@ -182,20 +186,18 @@ public interface ICobol2Json  extends  Icb2xml2Json  {
 	 * @param json json String
 	 * @return equivalent Cobol record (as a byte array)
 	 * 
-	 * @throws JsonParseException
 	 * @throws IOException
 	 */
-	byte[] jsonStringToSingleCobolRecord(String json) throws JsonParseException, IOException;
+	byte[] jsonStringToSingleCobolRecord(String json) throws IOException;
 
 	/**
 	 * Convert json to a Single Cobol record (as a stream of bytes) 
 	 * @param jsonReader a reader for the json String
 	 * @param outStream stream to write the cobol data
 	 * @return The Cobol2Json object for more updates
-	 * @throws JsonParseException
 	 * @throws IOException
 	 */
-	ICobol2Json jsonObjectToCobolFile(Reader jsonReader, OutputStream outStream) throws JsonParseException, IOException;
+	ICobol2Json jsonObjectToCobolFile(Reader jsonReader, OutputStream outStream) throws IOException;
 
 	/**
 	 * Convert a json object to a single Cobol Record
@@ -203,10 +205,9 @@ public interface ICobol2Json  extends  Icb2xml2Json  {
 	 * @param outFileName name of the <i>Cobol data file</i> where the Cobol data is to be written
 	 * @return Cobol2json object so more conversions can be run
 	 * 
-	 * @throws JsonParseException
 	 * @throws IOException
 	 */
-	ICobol2Json jsonObjectToCobolFile(String jsonFileName, String outFileName) throws JsonParseException, IOException;
+	ICobol2Json jsonObjectToCobolFile(String jsonFileName, String outFileName) throws  IOException;
 
 	/**
 	 * Convert a json array to a multiple Cobol Records
@@ -215,10 +216,9 @@ public interface ICobol2Json  extends  Icb2xml2Json  {
 	 * @param outStream Stream to write the Cobol Data to
 	 * @return  Cobol2json object so more conversions can be run
 	 * 
-	 * @throws JsonParseException
 	 * @throws IOException
 	 */
-	ICobol2Json jsonArrayToCobolFile(Reader jsonReader, OutputStream outStream) throws JsonParseException, IOException;
+	ICobol2Json jsonArrayToCobolFile(Reader jsonReader, OutputStream outStream) throws IOException;
 
 	/**
 	 * Convert a json array to a multiple Cobol Records
@@ -227,22 +227,26 @@ public interface ICobol2Json  extends  Icb2xml2Json  {
 	 * @param outFileName Name of File to write Cobol data to
 	 * @returnCobol2json object so more conversions can be run
 	 * 
-	 * @throws JsonParseException
 	 * @throws IOException
 	 */
-	ICobol2Json jsonArrayToCobolFile(String jsonFileName, String outFileName) throws JsonParseException, IOException;
+	ICobol2Json jsonArrayToCobolFile(String jsonFileName, String outFileName) throws IOException;
 
 	/**
 	 * Convert JSon to a list of lines
 	 * @param jsonReader wherethe json is to be read from
 	 * @return List of Lines
-	 * @throws JsonParseException
 	 * @throws IOException
 	 */
 	List<AbstractLine> jsonArrayToCobolLines(Reader jsonReader)
-			throws JsonParseException, IOException;
+			throws IOException;
 
 
+	ICobol2Json writeSampleCobol2json(String fileName) throws IOException;
+	ICobol2Json writeSampleCobol2json(Writer writer) throws IOException;
+
+	ICobol2Json jsonSchemaForCobol2json(Writer writer) throws IOException;
+
+//	ICobol2Json jsonSchemaForCobol2json2(Writer writer) throws IOException;
 	
 
 

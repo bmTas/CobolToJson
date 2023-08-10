@@ -4,19 +4,18 @@ import java.io.File;
 import java.io.IOException;
 
 import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 
 public class ReadJsonTest {
 
-	public static void main(String[] args) throws JsonParseException, IOException {
+	public static void main(String[] args) throws IOException {
 		(new ReadJsonTest()).readJson("G:/Temp/amsPoDownload_records.json");
 		//(new ReadJsonTest()).readJson("G:/Temp/DTAR020_tst1.bin.json");
 	}
 
 	JsonFactory factory = new JsonFactory();
-	private void readJson(String jsonFileName) throws IOException, JsonParseException {
+	private void readJson(String jsonFileName) throws IOException {
 		//JsonParser  parser  = factory.createParser(new File(jsonFileName));
 		ParserMgr parserMgr = new ParserMgr(factory.createParser(new File(jsonFileName)));
 		ArrayMgr arrayMgr = new ArrayMgr(parserMgr);

@@ -8,14 +8,12 @@ import java.util.List;
 
 import org.junit.Test;
 
-import com.fasterxml.jackson.core.JsonParseException;
-
 import net.sf.JRecord.Details.AbstractLine;
 
 public class TstReadJson {
 
 	@Test
-	public void test() throws JsonParseException, IOException {
+	public void test() throws IOException {
 		//ICobol2Json c2j = getAmsC2J();
 		int i = 0;
 		System.out.println(Data_AmsPo.toJsonStr());
@@ -28,7 +26,7 @@ public class TstReadJson {
 
 
 	@Test
-	public void testDTAR020() throws JsonParseException, IOException {
+	public void testDTAR020() throws IOException {
 		//ICobol2Json c2j = getAmsC2J();
 		String jsonStr = Data_AmsPo.toJsonStr(Data_DTAR.DTAR020_JSON_LINES_1);
 		System.out.println(jsonStr);

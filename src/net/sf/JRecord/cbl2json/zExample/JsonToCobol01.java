@@ -2,8 +2,6 @@ package net.sf.JRecord.cbl2json.zExample;
 
 import java.io.IOException;
 
-import com.fasterxml.jackson.core.JsonParseException;
-
 import net.sf.JRecord.Common.IFileStructureConstants;
 import net.sf.JRecord.External.CopybookLoader;
 import net.sf.JRecord.Option.IReformatFieldNames;
@@ -12,7 +10,7 @@ import net.sf.cobolToJson.Cobol2Json;
 
 public class JsonToCobol01 {
 
-	public static void main(String[] args) throws JsonParseException, IOException {
+	public static void main(String[] args) throws IOException {
 		Cobol2Json.newCobol2Json(Cbl2JsonCode.getFullName("DTAR020.cbl"))
 		  .setFont("cp037")
 		  .setFileOrganization(IFileStructureConstants.IO_FIXED_LENGTH) 
