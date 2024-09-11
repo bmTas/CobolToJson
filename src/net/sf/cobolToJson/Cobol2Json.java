@@ -26,7 +26,7 @@ import net.sf.cobolToJson.impl.RecordSelect;
  *
  */
 public class Cobol2Json  {
-	public static final JRecordConstantVars JR_CONSTANTS = JRecordConstantVars.INSTANCE;
+	public static final JRecordConstantVars JR_CONSTANTS = new JRecordConstantVars();
 	public static final ArrayElementChecks  ARRAY_CHECK_BUILDER = ArrayElementChecks.INSTANCE;
 	public static final StandardItemWriteChecks COBOL_ITEM_WRITE_CHECKS = StandardItemWriteChecks.INSTANCE;
 	public static final StandardFieldFormats FIELD_FORMATS = StandardFieldFormats.INSTANCE;
