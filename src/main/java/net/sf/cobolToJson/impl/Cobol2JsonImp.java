@@ -781,8 +781,8 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 		ListLineWriter lw = new ListLineWriter();
 		(new JsonToCobol()).readJson(
 				jsonReader,
-				new ToJRecordFile(asIOBuilder(), lw), 
-				super.getRenameToCobol());
+				new ToJRecordFile(asIOBuilder(), lw, false), 
+				super.getRenameToCobol()); 
 		return lw.getLines();
 	}
 	
@@ -793,7 +793,7 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 		
 		(new JsonToCobol()).readJson(
 				jsonReader,
-				new ToJRecordFile(ioBuilder, ioBuilder.newWriter(outStream)), 
+				new ToJRecordFile(ioBuilder, ioBuilder.newWriter(outStream), false), 
 				super.getRenameToCobol());
 		return this;
 	}
@@ -821,6 +821,13 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 		return this;
 	}
 	
+	@Override
+	public AbstractLine jsonObjectToCobolLine(Reader jsonReader) throws IOException {
+		AbstractLine line = asIOBuilder().newLine();
+		
+		(new JsonToCobol()).readJson(jsonReader, new ToJRecordLine(line), super.getRenameToCobol());
+		return line;
+	}
 
 	@Override
 	public byte[] jsonStringToSingleCobolRecord(String json) throws IOException {
@@ -874,243 +881,6 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 		return true;
 	}
 
-//	@Override
-//	public void json2Cobol(String xmlFileName, String cobolFileName) 
-//	throws RecordException, IOException,  XMLStreamException {
-//		json2Cobol(new FileInputStream(xmlFileName), new BufferedOutputStream(new FileOutputStream(cobolFileName), 0x4000));
-//	}
-//
-//	@Override
-//	public void json2Cobol(InputStream xmlStream, OutputStream cobolStream) 
-//	throws RecordException, IOException,  XMLStreamException{
-//		//XMLInputFactory f = XMLInputFactory.newInstance();
-//		doInit();
-//		if (itemDtls.getDuplicateFieldsStatus() == UpdateSchemaItems.D_DUPLICATES) {
-//			throw new RuntimeException("Duplicate names are not supported for Xml --> Cobol");
-//		}
-////		String spaces = "                                                                                                  ";
-//		String lastName = "", name;
-//		int lvl = 0;
-//		JsonToken lastType, type = JsonToken.VALUE_NULL;
-//		JsonFactory jfactory = new JsonFactory();
-//
-//		/*** read from file ***/
-//		JsonParser parser = jfactory.createParser(xmlStream);
-//		//XMLStreamReader parser = XMLInputFactory.newInstance().createXMLStreamReader(xmlStream);
-//		AbstractLine l = null;
-//		AbstractLineWriter w = iob.newWriter(cobolStream);		
-//		StringBuilder b = new StringBuilder();
-//		Map<String, ? extends IItem> arrayItems = itemDtls.getArrayItems();
-//		IntStack arrayDtls = new IntStack();
-//		IntStack levelNames = new IntStack();
-//		IGetRecordFieldByName fieldLookup = itemDtls.getFieldLookup();
-//		Map<String, Integer> recordHierarchyMap = itemDtls.getRecordHierarchyMap();
-//		int maxHierarchLvl = itemDtls.getMaxRecordHierarchyLevel();
-//		String recordName = "";
-//		Integer lookupLvl;
-//		boolean lastWasArray = false;
-//		
-//
-//		lastType = type;
-//		type = parser.nextToken();
-//		
-//		switch (type) {
-//		case START_ARRAY:
-//			break;
-//		case FIELD_NAME:
-//			String n = parser.getText();
-//			type = parser.nextToken();
-//			
-////			switch (type) {
-////			case START_ARRAY:
-////				break;
-////			case START_OBJECT:
-////				//TODO single Object
-////				break;
-////			default:
-////				throw new RecordException("Invalid JSon, Expecting Array/Object and  not a " + type.name());
-////			}
-//			break;
-//		default:
-//			throw new RecordException("Invalid JSon, was not expecting a " + type.name() + " at the start");
-//		}
-////		while ((type = parser.nextToken()) != null) {
-////			
-////			switch (type) {
-////			case START_OBJECT:
-////            	lvl += 1;
-////            	name = parser.getName().toString();
-////            	if (lvl == 2 
-////                || (     maxHierarchLvl >= lvl - 3
-////                   &&	(lookupLvl = recordHierarchyMap.get(name.toUpperCase())) != null
-////             	   &&    lookupLvl >= lvl - 3 
-////             		)) {
-////            		if (l != null) {
-//////           			System.out.println();
-//////            			System.out.println(l.getFullLine());
-////            			w.write(l);
-////            		}
-////        			recordName = name;
-////
-////            		l = iob.newLine();
-////            		if (schema.getRecordCount() > 1) {
-////            			int recIdx = schema.getRecordIndex(name);
-////            			if (recIdx >= 0) {
-////            				l.setWriteLayout(recIdx);
-////            			}
-////            		}
-//////            	} else if ((lookupLvl = recordHierarchyMap.get(name.toUpperCase())) != null) {
-//////            		System.out.println("## " + name + " " + lookupLvl + " " + lvl );
-//////            	} else if (lvl <= 4 && name.indexOf("Record") >= 0) {
-//////            		System.out.println("** " + name + " " + lvl );
-////            	}
-//////            	System.out.println();
-//////           	System.out.print(spaces.substring(spaces.length() - 2 * lvl +1) + parser.getName() + " >");
-////            	String ucName;
-////            	if (name != null && arrayItems.containsKey((ucName = name.toUpperCase()))) {
-////            		if (name.equalsIgnoreCase(levelNames.getLastName())) {
-////            			arrayDtls.inc();
-////            		} else {
-////            			arrayDtls.add(0, name, arrayItems.get(ucName));
-////            		}
-////            	}
-////            	
-////            	lastName = name;
-////            	levelNames.add(0, name, null);
-////            	b.setLength(0);
-////            	
-////            	
-////            	break;
-////            case END_OBJECT:
-////            	String name2 = parser.getName().toString();
-////    			int[] indexes = arrayDtls.toArray();
-////            	
-//////				System.out.print(b + "< " + name2 );
-////				
-////				if (lastName.equals(name2)) {
-////	        		IFieldDetail f;
-////	        		String n = lastName;
-////	        		
-////	        		f = fieldLookup.getField(recordName, n, indexes);
-////	        		
-////	        		if (f == null) {
-////	        			if (b.length() > 0) {
-////	        				f = fieldLookup.getField(recordName, n, indexes);
-////	        				throw new RuntimeException("Field: " + n + " does not exist, can not assign '" + b.toString() + "'");
-////	        			}
-////	        		} else {
-////		        		AbstractFieldValue fieldValue = l.getFieldValue(f);
-////			        	if (lastType == XMLStreamConstants.START_ELEMENT) {
-////							fieldValue.set(CommonBits.NULL_VALUE);
-////			        	} else {
-////			        		String txt = b.toString();
-////			        		if (fieldValue.isNumeric()) {
-////			        			txt = txt.trim();
-////			        		}
-////							fieldValue.set(txt);
-////			        	}
-////	        		}
-////		        	b.setLength(0); 	
-////				}
-////				
-////				if (lastWasArray) {
-////					IItem item = arrayDtls.getLastItem();
-////					if (item != null && item.arrayCheck != null && arrayDtls.size >= 0) {
-////						item.arrayCheck.updateForCount(l, item, indexes, arrayDtls.stack[arrayDtls.size]+1);
-////					}					
-////				}
-////				lastWasArray = false;
-////				if (name2 != null && name2.equalsIgnoreCase(arrayDtls.getName())) {
-////					arrayDtls.remove();
-////					lastWasArray = true;
-////				}
-////				levelNames.remove();
-////            	lvl -= 1;
-////            	break;
-////            case CHARACTERS:
-////            	String text = parser.getText();
-////            	
-////            	b.append(text);
-////            	
-//// //           	System.out.print(text.trim());
-////            	break;
-//////            case (XMLStreamConstants.START_DOCUMENT) :
-//////            break;
-//////            case (XMLStreamConstants.COMMENT) :
-//////            break;
-//////            case (XMLStreamConstants.DTD) :
-//////            	break;
-//////            case (XMLStreamConstants.ENTITY_REFERENCE) :
-//////            	break;
-//////            case (XMLStreamConstants.CDATA) :
-//////              break;
-//////            case (XMLStreamConstants.END_DOCUMENT): 
-//////            	break;
-////          	default:
-////			}
-////			lastType = type;
-////		}
-//		
-////		if (l != null) {
-////			w.write(l);
-////		}
-//		parser.close();
-//		xmlStream.close();
-//		w.close();
-//		cobolStream.close();
-//	}
-	
-//	private void processJson(String recordType, JsonParser parser, JsonToken type) throws JsonParseException, IOException {
-//		//TODO write
-//		//TODO write
-//		//TODO write
-//		//TODO write
-//		Map<String, ? extends IItem> arrayItems = itemDtls.getArrayItems();
-//		IntStack arrayDtls = new IntStack();
-//		IntStack levelNames = new IntStack();
-//		IGetRecordFieldByName fieldLookup = itemDtls.getFieldLookup();
-//		Map<String, Integer> recordHierarchyMap = itemDtls.getRecordHierarchyMap();
-//		int maxHierarchLvl = itemDtls.getMaxRecordHierarchyLevel();
-//		JsonToken lastType = type;
-//		IntStack stack = new IntStack();
-//		IntStack nameStack = new IntStack();
-//		AbstractLine l = null; //iob.newLine();
-//		String currentName, name = recordType;
-//
-//		
-//		while ((type = parser.nextToken()) != null) {
-//			currentName = "";
-//			switch (type) {
-//			case START_ARRAY:			
-//				IItem item = null;
-//				if (nameStack.size > 0) {
-//					//fieldLookup.getField(recordType, name, arrayDtls.toArray());
-//					item = arrayItems.get(name.toUpperCase());
-//					arrayDtls.add(0);
-//				}
-//				nameStack.add(-1, name, item, type);
-//				break;
-//			case END_ARRAY:
-//				nameStack.remove();
-//				break;
-//			case START_OBJECT:
-//				if (parser.getCurrentName() == null) {
-//					
-//				} else {
-//					
-//				}
-//				break;
-//			case END_OBJECT:
-//				break;
-//			case FIELD_NAME:
-//				currentName = parser.getText();
-//				nameStack.set(currentName); 
-//				break;
-//			}
-//			
-//			name = currentName;
-//		}
-//	}
 	
 	/**
 	 * Class to keep track of Cobol Group Levels

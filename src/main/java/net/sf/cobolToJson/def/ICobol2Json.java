@@ -7,7 +7,7 @@ import java.io.Reader;
 import java.io.Writer;
 import java.util.List;
 
-import net.sf.JRecord.Details.AbstractLine;
+//import net.sf.JRecord.Details.AbstractLine;
 import net.sf.JRecord.Details.RecordDecider;
 import net.sf.JRecord.ExternalRecordSelection.ExternalSelection;
 import net.sf.JRecord.Option.IRecordPositionOption;
@@ -237,7 +237,7 @@ public interface ICobol2Json  extends  Icb2xml2Json  {
 	 * @return List of Lines
 	 * @throws IOException
 	 */
-	List<AbstractLine> jsonArrayToCobolLines(Reader jsonReader)
+	List<net.sf.JRecord.Details.AbstractLine> jsonArrayToCobolLines(Reader jsonReader)
 			throws IOException;
 
 

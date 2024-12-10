@@ -16,7 +16,7 @@ public class ReadJsonTest2 {
 	public static class ProcessFlds implements IProcessFields {
 
 		@Override
-		public void endObject(int level, String fieldName) {
+		public void endObject(int level, boolean endOfLine,  String fieldName) {
 			if (level == 1 ) {
 				System.out.println();
 			}

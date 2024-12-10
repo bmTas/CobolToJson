@@ -14,7 +14,7 @@ public class ToJRecordLine extends AFieldsToJRecLine {
 	}
 
 	@Override
-	public void endObject(int level, String fieldName) {
+	public void endObject(int level, boolean endOfLine, String fieldName) {
 	}
 
 	@Override

@@ -3,12 +3,15 @@ package net.sf.cobolToJson.def;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.Reader;
 import java.io.Writer;
 import java.util.List;
 
+import net.sf.JRecord.Details.AbstractLine;
 import net.sf.JRecord.Details.RecordDecider;
 import net.sf.JRecord.ExternalRecordSelection.ExternalSelection;
 import net.sf.JRecord.Option.IRecordPositionOption;
+import net.sf.JRecord.def.IO.builders.ISchemaIOBuilder;
 import net.sf.JRecord.def.IO.builders.Icb2xmlLoadOptions;
 import net.sf.JRecord.schema.IArrayItemCheck;
 import net.sf.JRecord.schema.jaxb.interfaces.IFormatField;
@@ -77,6 +80,12 @@ public interface Icb2xml2Json extends Icb2xmlLoadOptions {
 	 * 
 	 **/
 
+	/**
+	 * Get the IoBuilder 
+	 * @return iO-Builder
+	 */
+	ISchemaIOBuilder asIOBuilder();
+	
 	public abstract Icb2xml2Json setFileOrganization(int fileOrganization);
 
 	@Override public abstract Icb2xml2Json setSplitCopybook(int splitCopybook);
@@ -268,6 +277,14 @@ public interface Icb2xml2Json extends Icb2xmlLoadOptions {
 	 * @throws IOException
 	 */
 	Icb2xml2Json writeSampleCobol2json(Writer writer) throws IOException;
+
+	/**
+	 * convert Json
+	 * @param jsonReader
+	 * @return
+	 * @throws IOException
+	 */
+	AbstractLine jsonObjectToCobolLine(Reader jsonReader) throws IOException;
 
 //	/**
 //	 * Convert Input Json-Data to Cobol Data-File

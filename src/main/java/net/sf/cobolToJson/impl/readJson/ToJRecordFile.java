@@ -34,8 +34,8 @@ public class ToJRecordFile extends AFieldsToJRecLine {
 	 * @see net.sf.cobolToJson.impl.readJson.IProcessFields#newObject(int, java.lang.String)
 	 */
 	@Override
-	public void endObject(int level, String fieldName) {
-		if (level == 1 && ! singleObject) {
+	public void endObject(int level, boolean endOfLine, String fieldName) {
+		if (endOfLine && ! singleObject) {
 			try {
 				writeLine();
 			
