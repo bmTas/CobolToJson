@@ -28,6 +28,13 @@ import net.sf.JRecord.schema.jaxb.interfaces.IWriteCheck;
 public interface Icb2xml2Json extends Icb2xmlLoadOptions {
 	public static final String MAIN_XML_TAG = "CobolData";
 
+
+	/**
+	 * Get the IoBuilder 
+	 * @return iO-Builder
+	 */
+	ISchemaIOBuilder asIOBuilder();
+
 	/**
 	 * File Organization or File Structure (e.g. VB, Fixed Width Etc. Use IFileStructureConstants.IO_*
 	 * The main options are:<ul>
@@ -78,14 +85,7 @@ public interface Icb2xml2Json extends Icb2xmlLoadOptions {
 	 * 
 	 * @param fileOrganization File Organization (or File Structure)
 	 * 
-	 **/
-
-	/**
-	 * Get the IoBuilder 
-	 * @return iO-Builder
-	 */
-	ISchemaIOBuilder asIOBuilder();
-	
+	 **/	
 	public abstract Icb2xml2Json setFileOrganization(int fileOrganization);
 
 	@Override public abstract Icb2xml2Json setSplitCopybook(int splitCopybook);

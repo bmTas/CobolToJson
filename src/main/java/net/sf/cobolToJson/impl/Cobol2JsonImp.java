@@ -41,8 +41,14 @@ import net.sf.JRecord.schema.jaxb.IItem;
 import net.sf.JRecord.schema.jaxb.Item;
 import net.sf.JRecord.schema.jaxb.ItemRecordDtls;
 import net.sf.JRecord.schema.jaxb.LineItemHelper;
+import net.sf.cb2xml.copybookReader.ICobolCopybookTextSource;
 //import net.sf.JRecord.schema.jaxb.Item;
 import net.sf.cobolToJson.def.ICobol2Json;
+import net.sf.cobolToJson.def.ICobolJsonConversion;
+import net.sf.cobolToJson.def.ICobolMultipleRecordsToArrayIn;
+import net.sf.cobolToJson.def.ICobolRecordToJsonObjectIn;
+import net.sf.cobolToJson.def.IJsonArrayToMultipleCobolRecordsIn;
+import net.sf.cobolToJson.def.IJsonObjectToCobolRecordIn;
 import net.sf.cobolToJson.def.Icb2xml2Json;
 import net.sf.cobolToJson.impl.jsonSchema.WriteJsonSchema;
 import net.sf.cobolToJson.impl.jsonWriter.IJsonWriter;
@@ -64,7 +70,7 @@ import net.sf.cobolToJson.util.errorLog.ILogLinesInError;
  * @author Bruce Martin
  *
  */
-public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICobol2Json {
+public class Cobol2JsonImp extends CobolSchemaReader<Cobol2JsonImp> implements ICobol2Json, ICobolJsonConversion {
 
 	
 	private ISchemaInformation itemDtls = null;
@@ -102,6 +108,14 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	}
 
 
+	private Cobol2JsonImp(ICobolCopybookTextSource copybookTextSource, ICopybookLoaderCobol loader) {
+		super(copybookTextSource.getCopybookName(), loader);
+		loader.setSaveCb2xmlDocument(true);
+		
+		super.addCopyBook(copybookTextSource);
+	}
+
+
 	
 	@Override
 	public void cobol2json(String cobolFileName, String jsonFileName) throws IOException  {
@@ -109,13 +123,17 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	}
 	
 	@Override
-	public void cobol2json(InputStream cobolStream, Writer writer) throws IOException {
+	public void cobol2json(InputStream cobolStream, Writer writer) throws IOException {		
+		doInit();
+        cobol2json(cobolSchemaDetails.ioBuilder.newReader(cobolStream), writer);
+ 	}
+
+	public void cobol2json(AbstractLineReader cobolDataReader, Writer writer) throws IOException {
 		doInit();
 		
-        cobol2json(cobolSchemaDetails.ioBuilder.newReader(cobolStream), newJsonGenerator(writer));
+        cobol2jsonInternal(cobolDataReader, newJsonGenerator(writer));
         writer.close();
 	}
-
 	
 
 	@Override
@@ -131,18 +149,27 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	public void singleCobolRecord2json(byte[] cobolData, Writer writer) throws IOException {
 		doInit();
 		
+		AbstractLine line = cobolSchemaDetails.ioBuilder
+				.newLine(cobolData);
+		
+		singleLine2json(line, writer);
+	}
+
+
+	public void singleCobolRecord2json(AbstractLine line, Writer writer) throws IOException  {
+		doInit();
+		singleLine2json(line, writer);
+	}
+
+	private void singleLine2json(AbstractLine line, Writer writer) throws IOException {
 		JsonWriter w = newJsonGenerator(writer);
 		LineItemHelper lineItemHelper = new LineItemHelper(cobolSchemaDetails.schema, false);
 
 		w.initWriter(prettyPrint);
-//        if (prettyPrint) {
-//        	w.setPrettyPrinter(new DefaultPrettyPrinter());
-//        }
-    	//w.writeStartObject();
+
 		writeLineAsRecord(
 				w, 
-				cobolSchemaDetails.ioBuilder
-					.newLine(cobolData), 
+				line, 
 				lineItemHelper, 
 				cobolSchemaDetails.recordItems, 
 				0);
@@ -150,12 +177,6 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 		w.close();
 		
 		logErrors.reportErrors();
-
-//        cobol2json(
-//        		new SingleLineReader(
-//        				cobolSchemaDetails.ioBuilder
-//        					.newLine(cobolData)),
-//        		new JsonFactory().createGenerator(writer));
 	}
 
 	
@@ -164,17 +185,17 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	public void cobol2json(InputStream cobolStream, OutputStream jsonStream) throws IOException {
 		doInit();
 		
-        cobol2json(cobolSchemaDetails.ioBuilder.newReader(cobolStream), new JsonWriter(jsonStream));
+        cobol2jsonInternal(cobolSchemaDetails.ioBuilder.newReader(cobolStream), new JsonWriter(jsonStream));
         jsonStream.close();
 	}
 	
 	@Override
-	public ICobol2Json writeSampleCobol2json(String fileName) throws IOException {
+	public Cobol2JsonImp writeSampleCobol2json(String fileName) throws IOException {
 		return writeSampleCobol2json(new FileWriter(fileName));
 	}
 	
 	@Override
-	public ICobol2Json writeSampleCobol2json(Writer writer) throws IOException {
+	public Cobol2JsonImp writeSampleCobol2json(Writer writer) throws IOException {
 		UpdateDetailsForSampleRecords updDtls = doInitForSampleJson(true);
 		
 		LayoutDetail layout = getLayout();
@@ -220,7 +241,7 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 		return new JsonWriter(writer);
 	}
 	
-	private void cobol2json(AbstractLineReader reader, JsonWriter writer) throws IOException {
+	private void cobol2jsonInternal(AbstractLineReader reader, JsonWriter writer) throws IOException {
 		cobol2json(reader.getLayout(), reader, writer, false);
 		
 		reader.close();
@@ -228,20 +249,10 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 
 
 	private void cobol2json(LayoutDetail schema, IReadLine reader, IJsonWriter jsonWriter, boolean arraySizeOne) throws IOException {
-//		LayoutDetail schema =  reader.getLayout();
-//	private void cobol2json(AbstractLineReader reader, JsonGenerator writer) throws IOException {
-//		LayoutDetail schema =  reader.getLayout();
         AbstractLine l;
         LineItemHelper lineItemHelper = new LineItemHelper(schema, arraySizeOne);
         //List<? extends IItem> items = cobolSchemaDetails.cobolCopybook.getCobolItems();
        	List<ItemRecordDtls> recordItems = cobolSchemaDetails.recordItems;
-
-       	//writer.set
-//       	jsonWriter.enable(JsonGenerator.Feature.AUTO_CLOSE_JSON_CONTENT);
-//       	jsonWriter.enable(JsonGenerator.Feature.FLUSH_PASSED_TO_STREAM);
-//        if (prettyPrint) {
-//        	jsonWriter.setPrettyPrinter(new DefaultPrettyPrinter());
-//        }
        	
        	jsonWriter.initWriter(prettyPrint);
         
@@ -412,13 +423,13 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	 * @param prettyPrint the prettyPrint to set
 	 */
 	@Override
-	public final ICobol2Json setPrettyPrint(boolean prettyPrint) {
+	public final Cobol2JsonImp setPrettyPrint(boolean prettyPrint) {
 		this.prettyPrint = prettyPrint;
 		return this;
 	}
 
 	@Override
-	public ICobol2Json setNameMainArray(boolean nameMainArray) {
+	public Cobol2JsonImp setNameMainArray(boolean nameMainArray) {
 		this.nameMainArray = nameMainArray;
 		return this;
 	}
@@ -954,6 +965,15 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 		}	
 	}
 
+
+	public static ICobolJsonConversion newCobolJsonConversion(String cobolCopybook) {
+		return new Cobol2JsonImp(cobolCopybook, new CobolCopybookLoader());
+	}
+	
+	public static ICobolJsonConversion newCobolJsonConversion(Reader cobolCopybookReader, String copybookName) {
+		return new Cobol2JsonImp(cobolCopybookReader, copybookName, new CobolCopybookLoader());
+	}
+
 	
 	public static ICobol2Json newCobol2Json(String cobolCopybook) {
 		return new Cobol2JsonImp(cobolCopybook, new CobolCopybookLoader());
@@ -977,6 +997,30 @@ public class Cobol2JsonImp extends CobolSchemaReader<ICobol2Json> implements ICo
 	public static Icb2xml2Json newCb2Xml2Json(InputStream cobolCopybook, String copybookName) {
 		return new Cobol2JsonImp(cobolCopybook, copybookName, new XmlCopybookLoader());
 	}
+	
+	
+
+	@Override
+	public ICobolMultipleRecordsToArrayIn multipleRecordsToJsonArray() {
+		return new CobolMultipleRecordsToJsonArray(this);
+	}
+
+	@Override
+	public ICobolRecordToJsonObjectIn singleRecordToJsonObject() {
+		return new CobolRecordToJsonObject(this);
+	}
+
+
+	@Override
+	public IJsonArrayToMultipleCobolRecordsIn jsonArrayToMultipleRecords() {
+		return new JsonArrayToMultipleCobolRecords(this);
+	}
+
+	@Override
+	public IJsonObjectToCobolRecordIn jsonObjectToSingleRecord() {
+		return new JsonObjectToCobolRecord(this);
+	}
+
 
 	private static class ReadManager {
 		final IReadLine reader;

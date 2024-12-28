@@ -69,7 +69,62 @@ And the Json output
      "DTAR020-KCODE-STORE-KEY" : {   
 ~~~
 
+## Java Interface
+      
+The prefered way to access CobolToJson is via the **CobolJsonConversion** class:
 
+~~~java
+    CobolJsonConversion.newCobolJsonConversion("me/cobol/DTAR020.cbl")
+        .setFileOrganization(IFileStructureConstants.IO_FIXED_LENGTH)
+        .setSplitCopybook(CopybookLoader.SPLIT_NONE)
+        .setFont("cp037")
+        .setTagFormat(IReformatFieldNames.RO_UNDERSCORE)
+
+       .singleRecordToJsonObject()
+           .setCobolRecord(line.getData())
+           .toJsonString()
+~~~ 
+           
+First you specify the Cobol-Copybook and its attribtes (e.g. setFont, setFileOrganisation) Then
+you start the conversion dialog. There are 3 conversion dialogs, all have a setInput source method and a execute method.
+The 3 conversion dialogs are:
+
+* **singleRecordToJsonObject()** - Takes a single cobol record and converts it to JSON. The input could be a JRecord-Line
+or the first record from a File.
+* **multipleRecordsToJsonArray()** - Takes multiple Cobol Records and converts it to a JSON array of Objects.
+The input could be a List of JRecord-Lines, a Cobol-Data-File or a JRecord Line-Reader.
+* **jsonObjectToSingleRecord()** - Convert a JSON-Object to a single Cobol record
+* **jsonArrayToMultipleRecords()** - Convert a JSON array to either a list or file of Cobol records.
+
+There is also the older Cobol2Json interface
+
+    Cobol2Json.newCobol2Json(CobolCopybook)
+    Cobol2Json.newCobol2Json(CobolCopybookInputStream, Copybook name)
+    Cobol2Json.newCb2Xml2Json(Cb2xmlCopybook)
+    Cobol2Json.newCb2Xml2Json(Cb2xmlCopybookInputStream, CopybookName)
+ 
+ 
+
+A sample call:
+          
+~~~java
+        Cobol2Json.newCobol2Json(Cbl2JsonCode.getFullName("DTAR020.cbl"))
+             .setFont("cp037")
+             .setFileOrganization(Constants.IO_FIXED_LENGTH)
+             .setSplitCopybook(CopybookLoader.SPLIT_NONE)
+             .setTagFormat(IReformatFieldNames.RO_UNDERSCORE)
+             .cobol2json(
+                 "G:/Temp/DTAR020_tst1.bin",
+                 "G:/Temp/DTAR020_tst1.bin.json");
+~~~
+
+
+Other methods include:
+
+* **singleCobolRecord2json**  Convert a single Cobol record to a Json object (File or Writer).
+* **singleCobolRecord2jsonString**   Convert cobol record (array of bytes) to a java String. It will help you convert son data to / from a Cobol System. 
+
+    
 ## Batch Scripts
 
 These are the options you can use when calling <b>Cobol2Json</b> programs to convert Cobol data files to Json Files:
@@ -140,37 +195,6 @@ This converts a multi record file into Json. Please note the use of
                              -input  G:/Users/Bruce01/RecordEditor_HSQL/SampleFiles/Ams_PODownload_20041231.txt   ^
                              -output out/Ams_PODownload_20041231.txt.json
  
-## Java Interface
-
-As well as the Batch interface, Cobol2Json can be called from a JVM language (Java, Kotlin, Groovy, JRuby etc). This program interface offers mor options (e.g. Array checks, complicated RecordSelection etc). Once again these interface programs can be generated from the RecordEditor CodeGen Option.
-
-You can run the Cobol <==> Json process via the following methods of Cobol2Json class:
-
-    Cobol2Json.newCobol2Json(CobolCopybook)
-    Cobol2Json.newCobol2Json(CobolCopybookInputStream, Copybook name)
-    Cobol2Json.newCb2Xml2Json(Cb2xmlCopybook)
-    Cobol2Json.newCb2Xml2Json(Cb2xmlCopybookInputStream, CopybookName)
- 
- 
-
-A sample call:
-          
-~~~java
-        Cobol2Json.newCobol2Json(Cbl2JsonCode.getFullName("DTAR020.cbl"))
-             .setFont("cp037")
-             .setFileOrganization(Constants.IO_FIXED_LENGTH)
-             .setSplitCopybook(CopybookLoader.SPLIT_NONE)
-             .setTagFormat(IReformatFieldNames.RO_UNDERSCORE)
-             .cobol2json(
-                 "G:/Temp/DTAR020_tst1.bin",
-                 "G:/Temp/DTAR020_tst1.bin.json");
-~~~
-
-
-Other methods include:
-
-* **singleCobolRecord2json**  Convert a single Cobol record to a Json object (File or Writer).
-* **singleCobolRecord2jsonString**   Convert cobol record (array of bytes) to a java String. It will help you convert son data to / from a Cobol System. 
 
 ## Related
 
